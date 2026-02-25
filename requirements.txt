@@ -1,0 +1,6 @@
+imapclient
+beautifulsoup4
+requests
+python-dotenv
+readability-lxml
+PyPDF2
