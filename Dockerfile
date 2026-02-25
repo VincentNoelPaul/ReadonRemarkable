@@ -1,7 +1,8 @@
-FROM python:3.11-slim
+FROM debian:bookworm
 
-# Install wkhtmltopdf and dependencies
+# Install Python + wkhtmltopdf dependencies
 RUN apt-get update && apt-get install -y \
+    python3 python3-pip \
     wkhtmltopdf \
     libxrender1 \
     libxext6 \
@@ -9,17 +10,11 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
 
-# Copy requirements first (better caching)
 COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the app
 COPY app/ ./app/
 
-# Run the main script
-CMD ["python", "app/main.py"]
+CMD ["python3", "app/main.py"]
