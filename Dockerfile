@@ -2,7 +2,7 @@ FROM debian:bookworm
 
 # Install Python + wkhtmltopdf dependencies
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip \
+    python3 python3-pip python3-venv \
     wkhtmltopdf \
     libxrender1 \
     libxext6 \
@@ -12,9 +12,15 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Create a virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
+# Install Python dependencies inside the venv
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy your app
 COPY app/ ./app/
 
-CMD ["python3", "app/main.py"]
+CMD ["python", "app/main.py"]
