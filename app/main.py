@@ -23,6 +23,11 @@ signal.signal(signal.SIGINT, shutdown_handler)
 
 def main():
     log("Starting Read-Later service...")
+    log(f"IMAP_HOST={'set' if os.getenv('IMAP_HOST') else 'MISSING'}")
+    log(f"IMAP_USER={'set' if os.getenv('IMAP_USER') else 'MISSING'}")
+    log(f"IMAP_PASSWORD={'set' if os.getenv('IMAP_PASSWORD') else 'MISSING'}")
+    log(f"REMARKABLE_DEVICE_TOKEN={'set' if os.getenv('REMARKABLE_DEVICE_TOKEN') else 'MISSING'}")
+    log(f"Poll interval: {POLL_INTERVAL}s")
 
     while running:
         try:

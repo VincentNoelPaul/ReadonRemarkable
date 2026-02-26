@@ -27,23 +27,32 @@ def fetch_new_urls():
 
     urls = []
 
-    with IMAPClient(IMAP_HOST, ssl=True) as client:
-        client.login(IMAP_USER, IMAP_PASSWORD)
-        client.select_folder("INBOX")
+    try:
+        log(f"Connecting to IMAP server {IMAP_HOST} as {IMAP_USER}...")
+        with IMAPClient(IMAP_HOST, ssl=True) as client:
+            client.login(IMAP_USER, IMAP_PASSWORD)
+            log("IMAP login successful")
+            client.select_folder("INBOX")
 
-        messages = client.search(["UNSEEN"])
-        for msgid, data in client.fetch(messages, ["RFC822"]).items():
-            raw = data[b"RFC822"]
-            msg = email.message_from_bytes(raw, policy=policy.default)
-            body = _extract_body(msg)
+            messages = client.search(["UNSEEN"])
+            log(f"Found {len(messages)} unseen message(s)")
 
-            found = re.findall(URL_REGEX, body)
-            if found:
-                urls.append(found[0])
-                log(f"Found URL: {found[0]}")
-            else:
-                log("No URL found in email")
+            for msgid, data in client.fetch(messages, ["RFC822"]).items():
+                raw = data[b"RFC822"]
+                msg = email.message_from_bytes(raw, policy=policy.default)
+                subject = msg.get("Subject", "(no subject)")
+                log(f"Processing email: {subject}")
+                body = _extract_body(msg)
 
-            client.add_flags(msgid, ["\\Seen"])
+                found = re.findall(URL_REGEX, body)
+                if found:
+                    urls.append(found[0])
+                    log(f"Found URL: {found[0]}")
+                else:
+                    log(f"No URL found in email body ({len(body)} chars)")
+
+                client.add_flags(msgid, ["\\Seen"])
+    except Exception as e:
+        log(f"IMAP error: {e}")
 
     return urls
