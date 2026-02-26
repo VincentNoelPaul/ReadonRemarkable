@@ -20,7 +20,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies inside the venv
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir lxml_html_clean
 
 # Copy your app
 COPY app/ ./app/
