@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import email
@@ -9,6 +10,7 @@ from utils import log
 IMAP_HOST = os.getenv("IMAP_HOST")
 IMAP_USER = os.getenv("IMAP_USER")
 IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
+SSO_COOKIES_FILE = os.getenv("SSO_COOKIES_FILE", "/data/cookies.json")
 
 URL_REGEX = r"https?://[^\s<>\"')]+"
 
@@ -35,6 +37,33 @@ def _extract_pdf_attachments(msg):
             pdf_paths.append(path)
             log(f"Extracted PDF attachment: {filename}")
     return pdf_paths
+
+
+def _extract_cookies_attachment(msg):
+    """Detect a .json attachment and save it as the SSO cookies file.
+
+    Returns True if cookies were updated.
+    """
+    for part in msg.iter_attachments():
+        filename = part.get_filename() or ""
+        if not filename.lower().endswith(".json"):
+            continue
+        try:
+            data = part.get_content()
+            # get_content() returns str for text types, bytes for binary
+            text = data if isinstance(data, str) else data.decode("utf-8")
+            cookies = json.loads(text)
+            if not isinstance(cookies, list):
+                log(f"Ignoring {filename}: expected a JSON array of cookies")
+                continue
+            os.makedirs(os.path.dirname(SSO_COOKIES_FILE), exist_ok=True)
+            with open(SSO_COOKIES_FILE, "w") as f:
+                json.dump(cookies, f)
+            log(f"Updated SSO cookies from email attachment ({len(cookies)} cookies)")
+            return True
+        except Exception as e:
+            log(f"Failed to process cookie attachment {filename}: {e}")
+    return False
 
 
 def fetch_new_emails():
@@ -66,6 +95,9 @@ def fetch_new_emails():
                 subject = msg.get("Subject", "(no subject)")
                 log(f"Processing email: {subject}")
 
+                # Check for cookie file attachment (updates SSO session)
+                cookies_updated = _extract_cookies_attachment(msg)
+
                 # Extract PDF attachments
                 attachments = _extract_pdf_attachments(msg)
                 pdf_paths.extend(attachments)
@@ -76,8 +108,8 @@ def fetch_new_emails():
                 if found:
                     urls.append(found[0])
                     log(f"Found URL: {found[0]}")
-                elif not attachments:
-                    log(f"No URL or PDF found in email ({len(body)} chars)")
+                elif not attachments and not cookies_updated:
+                    log(f"No URL, PDF, or cookies found in email ({len(body)} chars)")
 
                 client.add_flags(msgid, ["\\Seen"])
     except Exception as e:
