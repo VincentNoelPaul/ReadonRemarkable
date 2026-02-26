@@ -1,5 +1,4 @@
 imapclient
 beautifulsoup4
 requests
-python-dotenv
 trafilatura
