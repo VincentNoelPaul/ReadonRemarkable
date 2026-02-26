@@ -1,23 +1,25 @@
 import os
 import signal
-import sys
 import time
 from email_reader import fetch_new_urls
 from pdf_generator import url_to_pdf
 from remarkable_client import upload_pdf
 from utils import log
 
-POLL_INTERVAL = 60  # seconds
+POLL_INTERVAL = 60
 
 running = True
+
 
 def shutdown_handler(signum, frame):
     global running
     log("Shutdown signal received, stopping...")
     running = False
 
+
 signal.signal(signal.SIGTERM, shutdown_handler)
 signal.signal(signal.SIGINT, shutdown_handler)
+
 
 def main():
     log("Starting Read-Later service...")
@@ -35,7 +37,6 @@ def main():
                         log(f"Uploaded to reMarkable: {pdf_path}")
                     else:
                         log(f"Failed to upload {pdf_path}")
-                    # Clean up the PDF file
                     try:
                         os.remove(pdf_path)
                     except OSError:
@@ -49,6 +50,7 @@ def main():
         time.sleep(POLL_INTERVAL)
 
     log("Service stopped.")
+
 
 if __name__ == "__main__":
     main()

@@ -2,6 +2,4 @@ imapclient
 beautifulsoup4
 requests
 python-dotenv
-readability-lxml
-lxml
-lxml_html_clean
+trafilatura

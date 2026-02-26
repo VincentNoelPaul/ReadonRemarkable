@@ -6,6 +6,7 @@ DEVICE_TOKEN = os.getenv("REMARKABLE_DEVICE_TOKEN")
 
 RM_BASE = "https://document-storage-production-dot-remarkable-production.appspot.com"
 
+
 def upload_pdf(pdf_path):
     if not DEVICE_TOKEN:
         log("REMARKABLE_DEVICE_TOKEN not configured")
@@ -17,7 +18,7 @@ def upload_pdf(pdf_path):
 
         headers = {
             "Authorization": f"Bearer {DEVICE_TOKEN}",
-            "Content-Type": "application/pdf"
+            "Content-Type": "application/pdf",
         }
 
         resp = requests.post(f"{RM_BASE}/upload", headers=headers, data=content)
