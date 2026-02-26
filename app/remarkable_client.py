@@ -1,12 +1,10 @@
+import base64
 import os
-import smtplib
-from email.message import EmailMessage
+import requests
 from utils import log
 
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 465
-SMTP_USER = os.getenv("IMAP_USER")
-SMTP_PASSWORD = os.getenv("IMAP_PASSWORD")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+RESEND_FROM = os.getenv("RESEND_FROM")
 DROPBOX_EMAIL = os.getenv("DROPBOX_EMAIL")
 
 
@@ -15,32 +13,40 @@ def upload_pdf(pdf_path):
         log("DROPBOX_EMAIL not configured")
         return False
 
-    if not SMTP_USER or not SMTP_PASSWORD:
-        log("IMAP_USER and IMAP_PASSWORD must be set for sending emails")
+    if not RESEND_API_KEY:
+        log("RESEND_API_KEY must be set")
+        return False
+
+    if not RESEND_FROM:
+        log("RESEND_FROM must be set (verified sender address in Resend)")
         return False
 
     try:
         filename = os.path.basename(pdf_path)
 
-        msg = EmailMessage()
-        msg["From"] = SMTP_USER
-        msg["To"] = DROPBOX_EMAIL
-        msg["Subject"] = filename
-
         with open(pdf_path, "rb") as f:
-            msg.add_attachment(
-                f.read(),
-                maintype="application",
-                subtype="pdf",
-                filename=filename,
-            )
+            content = base64.b64encode(f.read()).decode("utf-8")
 
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg)
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={
+                "from": RESEND_FROM,
+                "to": [DROPBOX_EMAIL],
+                "subject": filename,
+                "text": filename,
+                "attachments": [
+                    {"filename": filename, "content": content}
+                ],
+            },
+        )
 
-        log(f"Emailed {filename} to Dropbox ({DROPBOX_EMAIL})")
-        return True
+        if resp.ok:
+            log(f"Sent {filename} to Dropbox via Resend ({DROPBOX_EMAIL})")
+            return True
+        else:
+            log(f"Resend API error: {resp.status_code} {resp.text}")
+            return False
 
     except Exception as e:
         log(f"Email send error: {e}")

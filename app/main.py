@@ -26,6 +26,8 @@ def main():
     log(f"IMAP_HOST={'set' if os.getenv('IMAP_HOST') else 'MISSING'}")
     log(f"IMAP_USER={'set' if os.getenv('IMAP_USER') else 'MISSING'}")
     log(f"IMAP_PASSWORD={'set' if os.getenv('IMAP_PASSWORD') else 'MISSING'}")
+    log(f"RESEND_API_KEY={'set' if os.getenv('RESEND_API_KEY') else 'MISSING'}")
+    log(f"RESEND_FROM={'set' if os.getenv('RESEND_FROM') else 'MISSING'}")
     log(f"DROPBOX_EMAIL={'set' if os.getenv('DROPBOX_EMAIL') else 'MISSING'}")
     log(f"Poll interval: {POLL_INTERVAL}s")
 
