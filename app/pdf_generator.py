@@ -71,7 +71,9 @@ def _url_to_pdf_playwright(url, cookies):
             context.add_cookies(pw_cookies)
 
             page = context.new_page()
-            page.goto(url, wait_until="networkidle", timeout=60000)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Give JS a moment to render dynamic content (paywalled articles, etc.)
+            page.wait_for_timeout(3000)
 
             title = sanitize_filename(page.title() or "article")
             pdf_path = f"/tmp/{title}.pdf"
