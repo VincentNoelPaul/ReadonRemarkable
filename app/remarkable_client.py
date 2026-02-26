@@ -4,7 +4,7 @@ from email.message import EmailMessage
 from utils import log
 
 SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT = 465
 SMTP_USER = os.getenv("IMAP_USER")
 SMTP_PASSWORD = os.getenv("IMAP_PASSWORD")
 DROPBOX_EMAIL = os.getenv("DROPBOX_EMAIL")
@@ -35,8 +35,7 @@ def upload_pdf(pdf_path):
                 filename=filename,
             )
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(msg)
 
