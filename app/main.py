@@ -1,7 +1,7 @@
 import os
 import signal
 import time
-from email_reader import fetch_new_urls
+from email_reader import fetch_new_emails
 from pdf_generator import url_to_pdf
 from remarkable_client import upload_pdf
 from utils import log
@@ -33,10 +33,24 @@ def main():
 
     while running:
         try:
-            urls = fetch_new_urls()
+            urls, attached_pdfs = fetch_new_emails()
+
+            # Process attached PDFs
+            for pdf_path in attached_pdfs:
+                log(f"Processing attached PDF: {pdf_path}")
+                success = upload_pdf(pdf_path)
+                if success:
+                    log(f"Sent to Dropbox: {pdf_path}")
+                else:
+                    log(f"Failed to send {pdf_path}")
+                try:
+                    os.remove(pdf_path)
+                except OSError:
+                    pass
+
+            # Process URLs (generate PDF then send)
             for url in urls:
                 log(f"Processing URL: {url}")
-
                 pdf_path = url_to_pdf(url)
                 if pdf_path:
                     success = upload_pdf(pdf_path)

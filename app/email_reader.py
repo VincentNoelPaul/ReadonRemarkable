@@ -1,6 +1,7 @@
 import os
 import re
 import email
+import tempfile
 from email import policy
 from imapclient import IMAPClient
 from utils import log
@@ -20,16 +21,33 @@ def _extract_body(msg):
     return ""
 
 
-def fetch_new_urls():
+def _extract_pdf_attachments(msg):
+    """Extract PDF attachments from an email, save to temp files."""
+    pdf_paths = []
+    for part in msg.iter_attachments():
+        content_type = part.get_content_type()
+        filename = part.get_filename()
+        if content_type == "application/pdf" and filename:
+            data = part.get_content()
+            path = os.path.join(tempfile.gettempdir(), filename)
+            with open(path, "wb") as f:
+                f.write(data)
+            pdf_paths.append(path)
+            log(f"Extracted PDF attachment: {filename}")
+    return pdf_paths
+
+
+def fetch_new_emails():
     if not IMAP_HOST or not IMAP_USER:
         log("IMAP_HOST and IMAP_USER must be configured")
-        return []
+        return [], []
 
     if not IMAP_PASSWORD:
         log("IMAP_PASSWORD must be set")
-        return []
+        return [], []
 
     urls = []
+    pdf_paths = []
 
     try:
         log(f"Connecting to IMAP server {IMAP_HOST} as {IMAP_USER}...")
@@ -47,17 +65,22 @@ def fetch_new_urls():
                 msg = email.message_from_bytes(raw, policy=policy.default)
                 subject = msg.get("Subject", "(no subject)")
                 log(f"Processing email: {subject}")
-                body = _extract_body(msg)
 
+                # Extract PDF attachments
+                attachments = _extract_pdf_attachments(msg)
+                pdf_paths.extend(attachments)
+
+                # Extract URL from body
+                body = _extract_body(msg)
                 found = re.findall(URL_REGEX, body)
                 if found:
                     urls.append(found[0])
                     log(f"Found URL: {found[0]}")
-                else:
-                    log(f"No URL found in email body ({len(body)} chars)")
+                elif not attachments:
+                    log(f"No URL or PDF found in email ({len(body)} chars)")
 
                 client.add_flags(msgid, ["\\Seen"])
     except Exception as e:
         log(f"IMAP error: {e}")
 
-    return urls
+    return urls, pdf_paths
