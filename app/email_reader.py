@@ -51,7 +51,9 @@ def _extract_cookies_attachment(msg):
         try:
             data = part.get_content()
             # get_content() returns str for text types, bytes for binary
-            text = data if isinstance(data, str) else data.decode("utf-8")
+            # Use utf-8-sig to handle BOM that Cookie-Editor adds
+            text = data if isinstance(data, str) else data.decode("utf-8-sig")
+            text = text.lstrip("\ufeff")
             cookies = json.loads(text)
             if not isinstance(cookies, list):
                 log(f"Ignoring {filename}: expected a JSON array of cookies")
