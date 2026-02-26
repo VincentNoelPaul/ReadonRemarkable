@@ -26,7 +26,7 @@ def main():
     log(f"IMAP_HOST={'set' if os.getenv('IMAP_HOST') else 'MISSING'}")
     log(f"IMAP_USER={'set' if os.getenv('IMAP_USER') else 'MISSING'}")
     log(f"IMAP_PASSWORD={'set' if os.getenv('IMAP_PASSWORD') else 'MISSING'}")
-    log(f"REMARKABLE_DEVICE_TOKEN={'set' if os.getenv('REMARKABLE_DEVICE_TOKEN') else 'MISSING'}")
+    log(f"DROPBOX_EMAIL={'set' if os.getenv('DROPBOX_EMAIL') else 'MISSING'}")
     log(f"Poll interval: {POLL_INTERVAL}s")
 
     while running:
@@ -39,9 +39,9 @@ def main():
                 if pdf_path:
                     success = upload_pdf(pdf_path)
                     if success:
-                        log(f"Uploaded to reMarkable: {pdf_path}")
+                        log(f"Sent to Dropbox: {pdf_path}")
                     else:
-                        log(f"Failed to upload {pdf_path}")
+                        log(f"Failed to send {pdf_path}")
                     try:
                         os.remove(pdf_path)
                     except OSError:
