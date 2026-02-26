@@ -25,7 +25,13 @@ def main():
     log("Starting Read-Later service...")
     log(f"IMAP_HOST={'set' if os.getenv('IMAP_HOST') else 'MISSING'}")
     log(f"IMAP_USER={'set' if os.getenv('IMAP_USER') else 'MISSING'}")
-    log(f"IMAP_PASSWORD={'set' if os.getenv('IMAP_PASSWORD') else 'MISSING'}")
+    if os.getenv("MS_CLIENT_ID"):
+        log("Auth mode: OAuth2 (MS_CLIENT_ID is set)")
+        log(f"  MS_CLIENT_SECRET={'set' if os.getenv('MS_CLIENT_SECRET') else 'MISSING'}")
+        log(f"  MS_TENANT_ID={os.getenv('MS_TENANT_ID', 'common')}")
+    else:
+        log("Auth mode: password")
+        log(f"  IMAP_PASSWORD={'set' if os.getenv('IMAP_PASSWORD') else 'MISSING'}")
     log(f"REMARKABLE_DEVICE_TOKEN={'set' if os.getenv('REMARKABLE_DEVICE_TOKEN') else 'MISSING'}")
     log(f"Poll interval: {POLL_INTERVAL}s")
 
