@@ -29,6 +29,8 @@ def main():
     log(f"RESEND_API_KEY={'set' if os.getenv('RESEND_API_KEY') else 'MISSING'}")
     log(f"RESEND_FROM={'set' if os.getenv('RESEND_FROM') else 'MISSING'}")
     log(f"DROPBOX_EMAIL={'set' if os.getenv('DROPBOX_EMAIL') else 'MISSING'}")
+    sso_cookies = os.getenv("SSO_COOKIES_FILE", "/data/cookies.json")
+    log(f"SSO_COOKIES_FILE={sso_cookies} ({'found' if os.path.exists(sso_cookies) else 'not found'})")
     log(f"Poll interval: {POLL_INTERVAL}s")
 
     while running:
