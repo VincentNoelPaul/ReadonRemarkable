@@ -3,4 +3,3 @@ beautifulsoup4
 requests
 trafilatura
 lxml_html_clean
-msal
