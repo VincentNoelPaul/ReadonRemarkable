@@ -3,4 +3,4 @@ beautifulsoup4
 requests
 python-dotenv
 readability-lxml
-lxml
+lxml[html_clean]
