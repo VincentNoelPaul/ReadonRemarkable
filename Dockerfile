@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxext6 \
     libfontconfig1 \
+    libxml2-dev \
+    libxslt-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
