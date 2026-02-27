@@ -2,7 +2,7 @@ import os
 import signal
 import time
 from email_reader import fetch_new_emails
-from pdf_generator import url_to_pdf
+from pdf_generator import url_to_pdf, html_to_pdf
 from remarkable_client import upload_pdf
 from utils import log
 
@@ -35,7 +35,24 @@ def main():
 
     while running:
         try:
-            urls, attached_pdfs = fetch_new_emails()
+            urls, attached_pdfs, body_contents = fetch_new_emails()
+
+            # Process email bodies (ROM> / ROM1> subjects)
+            for title, html_content in body_contents:
+                log(f"Converting email body to PDF: {title}")
+                pdf_path = html_to_pdf(html_content, title)
+                if pdf_path:
+                    success = upload_pdf(pdf_path)
+                    if success:
+                        log(f"Sent to Dropbox: {pdf_path}")
+                    else:
+                        log(f"Failed to send {pdf_path}")
+                    try:
+                        os.remove(pdf_path)
+                    except OSError:
+                        pass
+                else:
+                    log(f"Failed to generate PDF for email: {title}")
 
             # Process attached PDFs
             for pdf_path in attached_pdfs:

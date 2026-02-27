@@ -143,6 +143,37 @@ img {{ max-width: 100%; height: auto; }}
             os.remove(html_path)
 
 
+def html_to_pdf(html_content, title):
+    """Convert an HTML string (email body) to a PDF using Playwright."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        log("Playwright not installed, cannot convert HTML to PDF")
+        return None
+
+    safe_title = sanitize_filename(title)
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.set_content(html_content, wait_until="domcontentloaded")
+            page.wait_for_timeout(1000)
+
+            pdf_path = f"/tmp/{safe_title}.pdf"
+            page.pdf(
+                path=pdf_path,
+                format="A4",
+                margin={"top": "20mm", "right": "15mm", "bottom": "20mm", "left": "15mm"},
+                print_background=True,
+            )
+            browser.close()
+            log(f"Generated PDF from email body: {safe_title}")
+            return pdf_path
+    except Exception as e:
+        log(f"HTML-to-PDF generation failed: {e}")
+        return None
+
+
 def url_to_pdf(url):
     """Convert a URL to PDF. Uses Playwright for SSO-protected URLs, trafilatura otherwise."""
     cookies = _load_sso_cookies()

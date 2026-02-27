@@ -13,6 +13,18 @@ IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
 SSO_COOKIES_FILE = os.getenv("SSO_COOKIES_FILE", "/data/cookies.json")
 
 URL_REGEX = r"https?://[^\s<>\"')]+"
+# Matches ROM> or ROM1> after optional Fw:/Fwd:/Tr:/Re: prefixes
+ROM_REGEX = re.compile(r"^(?:(?:Fw|Fwd|Tr|Re)\s*:\s*)*(ROM1?)>\s*(.*)", re.IGNORECASE)
+
+# Patterns that mark the start of a forwarded/quoted message
+_FWD_BOUNDARIES = [
+    re.compile(r"-{5,}\s*Forwarded message\s*-{5,}", re.IGNORECASE),
+    re.compile(r"-{5,}\s*Message transf[ée]r[ée]\s*-{5,}", re.IGNORECASE),
+    re.compile(r"_{20,}"),  # Outlook long underscore separator
+    re.compile(r"<div\s+class=\"gmail_quote\"", re.IGNORECASE),
+    # "From:" or "De:" header block after a line break (common in forwards)
+    re.compile(r"<br[^>]*>\s*(?:From|De)\s*:", re.IGNORECASE),
+]
 
 
 def _extract_body(msg):
@@ -21,6 +33,29 @@ def _extract_body(msg):
     if body:
         return body.get_content()
     return ""
+
+
+def _extract_html_body(msg):
+    """Extract body as HTML, preferring HTML part. Wraps plain text in basic HTML if needed."""
+    html_part = msg.get_body(preferencelist=("html",))
+    if html_part:
+        return html_part.get_content()
+    plain_part = msg.get_body(preferencelist=("plain",))
+    if plain_part:
+        text = plain_part.get_content()
+        escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return f"<pre>{escaped}</pre>"
+    return ""
+
+
+def _truncate_to_latest(html):
+    """Remove forwarded/quoted content, keeping only the latest message."""
+    for pattern in _FWD_BOUNDARIES:
+        match = pattern.search(html)
+        if match:
+            html = html[:match.start()]
+            break
+    return html
 
 
 def _extract_pdf_attachments(msg):
@@ -71,14 +106,15 @@ def _extract_cookies_attachment(msg):
 def fetch_new_emails():
     if not IMAP_HOST or not IMAP_USER:
         log("IMAP_HOST and IMAP_USER must be configured")
-        return [], []
+        return [], [], []
 
     if not IMAP_PASSWORD:
         log("IMAP_PASSWORD must be set")
-        return [], []
+        return [], [], []
 
     urls = []
     pdf_paths = []
+    body_contents = []
 
     try:
         log(f"Connecting to IMAP server {IMAP_HOST} as {IMAP_USER}...")
@@ -100,6 +136,23 @@ def fetch_new_emails():
                 # Check for cookie file attachment (updates SSO session)
                 cookies_updated = _extract_cookies_attachment(msg)
 
+                # Check for ROM> or ROM1> prefix → convert body to PDF
+                rom_match = ROM_REGEX.match(subject)
+                if rom_match:
+                    rom_mode = rom_match.group(1).upper()  # "ROM" or "ROM1"
+                    title = rom_match.group(2).strip() or "email"
+                    html_body = _extract_html_body(msg)
+                    if html_body:
+                        if rom_mode == "ROM1":
+                            html_body = _truncate_to_latest(html_body)
+                            log(f"ROM1> mode: keeping only latest message")
+                        body_contents.append((title, html_body))
+                        log(f"{rom_mode}> detected, will convert body to PDF: {title}")
+                    else:
+                        log(f"{rom_mode}> detected but email body is empty")
+                    client.add_flags(msgid, ["\\Seen"])
+                    continue
+
                 # Extract PDF attachments
                 attachments = _extract_pdf_attachments(msg)
                 pdf_paths.extend(attachments)
@@ -117,4 +170,4 @@ def fetch_new_emails():
     except Exception as e:
         log(f"IMAP error: {e}")
 
-    return urls, pdf_paths
+    return urls, pdf_paths, body_contents
