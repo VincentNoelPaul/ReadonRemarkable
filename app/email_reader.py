@@ -13,8 +13,8 @@ IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
 SSO_COOKIES_FILE = os.getenv("SSO_COOKIES_FILE", "/data/cookies.json")
 
 URL_REGEX = r"https?://[^\s<>\"')]+"
-# Matches ROM> or ROM1> after optional Fw:/Fwd:/Tr:/Re: prefixes
-ROM_REGEX = re.compile(r"^(?:(?:Fw|Fwd|Tr|Re)\s*:\s*)*(ROM1?)>\s*(.*)", re.IGNORECASE)
+# Matches ROR> or RORn> (n = integer) after optional Fw:/Fwd:/Tr:/Re: prefixes
+ROR_REGEX = re.compile(r"^(?:(?:Fw|Fwd|Tr|Re)\s*:\s*)*ROR(\d*)>\s*(.*)", re.IGNORECASE)
 
 # Patterns that mark the start of a forwarded/quoted message
 _FWD_BOUNDARIES = [
@@ -51,15 +51,20 @@ def _extract_html_body(msg):
     return ""
 
 
-def _truncate_to_latest(html):
-    """Remove forwarded/quoted content, keeping only the latest message."""
-    earliest = None
+def _find_all_boundaries(html):
+    """Return a sorted list of all boundary positions in *html*."""
+    positions = set()
     for pattern in _FWD_BOUNDARIES:
-        match = pattern.search(html)
-        if match and (earliest is None or match.start() < earliest):
-            earliest = match.start()
-    if earliest is not None:
-        html = html[:earliest]
+        for match in pattern.finditer(html):
+            positions.add(match.start())
+    return sorted(positions)
+
+
+def _truncate_to_latest(html, n=1):
+    """Keep only the latest *n* messages by cutting at the n-th boundary."""
+    boundaries = _find_all_boundaries(html)
+    if len(boundaries) >= n:
+        html = html[:boundaries[n - 1]]
     return html
 
 
@@ -141,20 +146,22 @@ def fetch_new_emails():
                 # Check for cookie file attachment (updates SSO session)
                 cookies_updated = _extract_cookies_attachment(msg)
 
-                # Check for ROM> or ROM1> prefix → convert body to PDF
-                rom_match = ROM_REGEX.match(subject)
-                if rom_match:
-                    rom_mode = rom_match.group(1).upper()  # "ROM" or "ROM1"
-                    title = rom_match.group(2).strip() or "email"
+                # Check for ROR> or RORn> prefix → convert body to PDF
+                ror_match = ROR_REGEX.match(subject)
+                if ror_match:
+                    n_str = ror_match.group(1)  # "" for ROR>, digits for RORn>
+                    keep_n = int(n_str) if n_str else 0
+                    title = ror_match.group(2).strip() or "email"
                     html_body = _extract_html_body(msg)
                     if html_body:
-                        if rom_mode == "ROM1":
-                            html_body = _truncate_to_latest(html_body)
-                            log(f"ROM1> mode: keeping only latest message")
+                        if keep_n:
+                            html_body = _truncate_to_latest(html_body, keep_n)
+                            log(f"ROR{keep_n}> mode: keeping latest {keep_n} message(s)")
+                        mode_label = f"ROR{n_str}>"
                         body_contents.append((title, html_body))
-                        log(f"{rom_mode}> detected, will convert body to PDF: {title}")
+                        log(f"{mode_label} detected, will convert body to PDF: {title}")
                     else:
-                        log(f"{rom_mode}> detected but email body is empty")
+                        log(f"ROR{n_str}> detected but email body is empty")
                     client.add_flags(msgid, ["\\Seen"])
                     continue
 

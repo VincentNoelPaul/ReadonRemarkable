@@ -37,7 +37,7 @@ def main():
         try:
             urls, attached_pdfs, body_contents = fetch_new_emails()
 
-            # Process email bodies (ROM> / ROM1> subjects)
+            # Process email bodies (ROR> / RORn> subjects)
             for title, html_content in body_contents:
                 log(f"Converting email body to PDF: {title}")
                 pdf_path = html_to_pdf(html_content, title)
