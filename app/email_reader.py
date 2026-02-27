@@ -53,11 +53,13 @@ def _extract_html_body(msg):
 
 def _truncate_to_latest(html):
     """Remove forwarded/quoted content, keeping only the latest message."""
+    earliest = None
     for pattern in _FWD_BOUNDARIES:
         match = pattern.search(html)
-        if match:
-            html = html[:match.start()]
-            break
+        if match and (earliest is None or match.start() < earliest):
+            earliest = match.start()
+    if earliest is not None:
+        html = html[:earliest]
     return html
 
 
