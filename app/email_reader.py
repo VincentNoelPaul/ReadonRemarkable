@@ -20,8 +20,11 @@ ROM_REGEX = re.compile(r"^(?:(?:Fw|Fwd|Tr|Re)\s*:\s*)*(ROM1?)>\s*(.*)", re.IGNOR
 _FWD_BOUNDARIES = [
     re.compile(r"-{5,}\s*Forwarded message\s*-{5,}", re.IGNORECASE),
     re.compile(r"-{5,}\s*Message transf[ée]r[ée]\s*-{5,}", re.IGNORECASE),
+    re.compile(r"-{5,}\s*Original\s+(?:email|message)\s*-{5,}", re.IGNORECASE),
     re.compile(r"_{20,}"),  # Outlook long underscore separator
     re.compile(r"<div\s+class=\"gmail_quote\"", re.IGNORECASE),
+    # Outlook border-top separator (reply/forward boundary)
+    re.compile(r"<div\s[^>]*border-top:\s*solid\s[^>]*>", re.IGNORECASE),
     # "From:" or "De:" header block after a line break (common in forwards)
     re.compile(r"<br[^>]*>\s*(?:From|De)\s*:", re.IGNORECASE),
 ]
