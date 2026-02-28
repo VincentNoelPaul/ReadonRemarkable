@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxext6 \
     libfontconfig1 \
+    && apt-get install -y --no-install-recommends libreoffice \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

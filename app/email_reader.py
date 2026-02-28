@@ -13,6 +13,12 @@ IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
 SSO_COOKIES_FILE = os.getenv("SSO_COOKIES_FILE", "/data/cookies.json")
 
 URL_REGEX = r"https?://[^\s<>\"')]+"
+
+# Image extensions to skip (email signatures, logos, etc.)
+_IMAGE_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+    ".bmp", ".ico", ".tif", ".tiff",
+}
 # Matches ROR> or RORn> (n = integer) after optional Fw:/Fwd:/Tr:/Re: prefixes
 ROR_REGEX = re.compile(r"^(?:(?:Fw|Fwd|Tr|Re)\s*:\s*)*ROR(\d*)>\s*(.*)", re.IGNORECASE)
 
@@ -84,6 +90,31 @@ def _extract_pdf_attachments(msg):
     return pdf_paths
 
 
+def _extract_convertible_attachments(msg):
+    """Extract non-PDF, non-image attachments that can be converted to PDF."""
+    from pdf_generator import CONVERTIBLE_EXTENSIONS
+
+    file_paths = []
+    for part in msg.iter_attachments():
+        filename = part.get_filename()
+        if not filename:
+            continue
+        ext = os.path.splitext(filename)[1].lower()
+        # Skip PDFs (handled separately), JSON (cookies), and images
+        if ext in (".pdf", ".json") or ext in _IMAGE_EXTENSIONS:
+            continue
+        if ext not in CONVERTIBLE_EXTENSIONS:
+            continue
+        data = part.get_content()
+        path = os.path.join(tempfile.gettempdir(), filename)
+        mode = "wb" if isinstance(data, bytes) else "w"
+        with open(path, mode) as f:
+            f.write(data)
+        file_paths.append(path)
+        log(f"Extracted convertible attachment: {filename}")
+    return file_paths
+
+
 def _extract_cookies_attachment(msg):
     """Detect a .json attachment and save it as the SSO cookies file.
 
@@ -116,15 +147,16 @@ def _extract_cookies_attachment(msg):
 def fetch_new_emails():
     if not IMAP_HOST or not IMAP_USER:
         log("IMAP_HOST and IMAP_USER must be configured")
-        return [], [], []
+        return [], [], [], []
 
     if not IMAP_PASSWORD:
         log("IMAP_PASSWORD must be set")
-        return [], [], []
+        return [], [], [], []
 
     urls = []
     pdf_paths = []
     body_contents = []
+    convertible_paths = []
 
     try:
         log(f"Connecting to IMAP server {IMAP_HOST} as {IMAP_USER}...")
@@ -169,17 +201,21 @@ def fetch_new_emails():
                 attachments = _extract_pdf_attachments(msg)
                 pdf_paths.extend(attachments)
 
+                # Extract convertible attachments (office docs, text, HTML)
+                convertible = _extract_convertible_attachments(msg)
+                convertible_paths.extend(convertible)
+
                 # Extract URL from body
                 body = _extract_body(msg)
                 found = re.findall(URL_REGEX, body)
                 if found:
                     urls.append(found[0])
                     log(f"Found URL: {found[0]}")
-                elif not attachments and not cookies_updated:
-                    log(f"No URL, PDF, or cookies found in email ({len(body)} chars)")
+                elif not attachments and not convertible and not cookies_updated:
+                    log(f"No URL, PDF, attachment, or cookies found in email ({len(body)} chars)")
 
                 client.add_flags(msgid, ["\\Seen"])
     except Exception as e:
         log(f"IMAP error: {e}")
 
-    return urls, pdf_paths, body_contents
+    return urls, pdf_paths, body_contents, convertible_paths

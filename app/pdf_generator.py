@@ -7,6 +7,15 @@ from utils import log, sanitize_filename
 
 SSO_COOKIES_FILE = os.getenv("SSO_COOKIES_FILE", "/data/cookies.json")
 
+# Extensions convertible via LibreOffice headless
+_LIBREOFFICE_EXTENSIONS = {
+    ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt",
+    ".odt", ".ods", ".odp", ".rtf", ".csv",
+}
+_TEXT_EXTENSIONS = {".txt"}
+_HTML_EXTENSIONS = {".html", ".htm"}
+CONVERTIBLE_EXTENSIONS = _LIBREOFFICE_EXTENSIONS | _TEXT_EXTENSIONS | _HTML_EXTENSIONS
+
 
 def _load_sso_cookies():
     """Load SSO cookies from a JSON file (exported from browser via Cookie-Editor extension)."""
@@ -186,3 +195,66 @@ def url_to_pdf(url):
         log("Playwright failed, falling back to trafilatura")
 
     return _url_to_pdf_trafilatura(url)
+
+
+def _file_to_pdf_libreoffice(file_path):
+    """Convert an office document to PDF using LibreOffice headless."""
+    try:
+        outdir = tempfile.gettempdir()
+        subprocess.run(
+            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", outdir, file_path],
+            check=True, capture_output=True, timeout=120,
+        )
+        base = os.path.splitext(os.path.basename(file_path))[0]
+        pdf_path = os.path.join(outdir, f"{base}.pdf")
+        if os.path.exists(pdf_path):
+            log(f"Converted to PDF via LibreOffice: {os.path.basename(file_path)}")
+            return pdf_path
+        log(f"LibreOffice conversion produced no output for {os.path.basename(file_path)}")
+        return None
+    except Exception as e:
+        log(f"LibreOffice conversion failed for {os.path.basename(file_path)}: {e}")
+        return None
+
+
+def _text_file_to_pdf(file_path):
+    """Convert a plain text file to PDF by wrapping in HTML."""
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        html = (
+            '<pre style="font-family: monospace; font-size: 12px; '
+            'white-space: pre-wrap; word-wrap: break-word;">'
+            f"{escaped}</pre>"
+        )
+        title = os.path.splitext(os.path.basename(file_path))[0]
+        return html_to_pdf(html, title)
+    except Exception as e:
+        log(f"Text-to-PDF conversion failed for {os.path.basename(file_path)}: {e}")
+        return None
+
+
+def _html_file_to_pdf(file_path):
+    """Convert an HTML file attachment to PDF."""
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            html_content = f.read()
+        title = os.path.splitext(os.path.basename(file_path))[0]
+        return html_to_pdf(html_content, title)
+    except Exception as e:
+        log(f"HTML-to-PDF conversion failed for {os.path.basename(file_path)}: {e}")
+        return None
+
+
+def file_to_pdf(file_path):
+    """Convert a file to PDF based on its extension."""
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in _LIBREOFFICE_EXTENSIONS:
+        return _file_to_pdf_libreoffice(file_path)
+    if ext in _TEXT_EXTENSIONS:
+        return _text_file_to_pdf(file_path)
+    if ext in _HTML_EXTENSIONS:
+        return _html_file_to_pdf(file_path)
+    log(f"Unsupported file type for conversion: {ext}")
+    return None
