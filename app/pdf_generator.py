@@ -14,7 +14,10 @@ _LIBREOFFICE_EXTENSIONS = {
 }
 _TEXT_EXTENSIONS = {".txt"}
 _HTML_EXTENSIONS = {".html", ".htm"}
-CONVERTIBLE_EXTENSIONS = _LIBREOFFICE_EXTENSIONS | _TEXT_EXTENSIONS | _HTML_EXTENSIONS
+_MARKDOWN_EXTENSIONS = {".md", ".markdown"}
+CONVERTIBLE_EXTENSIONS = (
+    _LIBREOFFICE_EXTENSIONS | _TEXT_EXTENSIONS | _HTML_EXTENSIONS | _MARKDOWN_EXTENSIONS
+)
 
 
 def _load_sso_cookies():
@@ -247,6 +250,31 @@ def _html_file_to_pdf(file_path):
         return None
 
 
+def _markdown_file_to_pdf(file_path):
+    """Convert a Markdown file to PDF by rendering to HTML first."""
+    try:
+        import markdown as md
+
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        body = md.markdown(text, extensions=["tables", "fenced_code"])
+        html = (
+            '<!DOCTYPE html><html><head><meta charset="utf-8">'
+            '<style>body { font-family: serif; max-width: 700px; margin: 40px auto; '
+            'padding: 0 20px; font-size: 14px; line-height: 1.6; color: #333; } '
+            'pre { background: #f4f4f4; padding: 12px; overflow-x: auto; } '
+            'code { background: #f4f4f4; padding: 2px 4px; } '
+            'table { border-collapse: collapse; } '
+            'th, td { border: 1px solid #ccc; padding: 6px 12px; }'
+            '</style></head><body>' + body + '</body></html>'
+        )
+        title = os.path.splitext(os.path.basename(file_path))[0]
+        return html_to_pdf(html, title)
+    except Exception as e:
+        log(f"Markdown-to-PDF conversion failed for {os.path.basename(file_path)}: {e}")
+        return None
+
+
 def file_to_pdf(file_path):
     """Convert a file to PDF based on its extension."""
     ext = os.path.splitext(file_path)[1].lower()
@@ -256,5 +284,7 @@ def file_to_pdf(file_path):
         return _text_file_to_pdf(file_path)
     if ext in _HTML_EXTENSIONS:
         return _html_file_to_pdf(file_path)
+    if ext in _MARKDOWN_EXTENSIONS:
+        return _markdown_file_to_pdf(file_path)
     log(f"Unsupported file type for conversion: {ext}")
     return None

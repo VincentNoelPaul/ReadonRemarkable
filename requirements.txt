@@ -4,3 +4,4 @@ requests
 trafilatura
 lxml_html_clean
 playwright
+markdown
