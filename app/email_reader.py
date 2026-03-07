@@ -44,6 +44,46 @@ def _extract_body(msg):
     return ""
 
 
+def _clean_email_html(html):
+    """Strip MS Word / Outlook artefacts that break headless PDF rendering.
+
+    Uses regex instead of BeautifulSoup because deeply-nested MS Word
+    HTML can cause infinite recursion in BS4's tree manipulation.
+    """
+    # 1. Strip conditional comments: <!--[if ...]>...<![endif]-->
+    html = re.sub(r"<!--\[if[^\]]*\]>.*?<!\[endif\]-->", "", html, flags=re.DOTALL)
+    html = re.sub(r"<!--\[if[^\]]*\]>", "", html)
+    html = re.sub(r"<!\[endif\]-->", "", html)
+
+    # 2. Remove VML (<v:…>), Word (<w:…>), Math (<m:…>) namespace blocks
+    for prefix in ("v", "w", "m"):
+        # Self-closing: <v:stroke ... />
+        html = re.sub(
+            rf"<{prefix}:[^>]*/\s*>", "", html, flags=re.IGNORECASE,
+        )
+        # Open+close pairs (greedy-match innermost first, repeat until stable)
+        pattern = re.compile(
+            rf"<{prefix}:(\w+)[^>]*>.*?</{prefix}:\1\s*>",
+            re.DOTALL | re.IGNORECASE,
+        )
+        prev = None
+        while prev != html:
+            prev = html
+            html = pattern.sub("", html)
+
+    # 3. Strip Office namespace tags (<o:p>, etc.) but keep inner content
+    html = re.sub(r"</?o:\w+[^>]*>", "", html, flags=re.IGNORECASE)
+
+    # 4. Remove images referencing cid: URLs (embedded signature images)
+    html = re.sub(r"<img\b[^>]*\bsrc\s*=\s*[\"']cid:[^\"']*[\"'][^>]*/?\s*>",
+                  "", html, flags=re.IGNORECASE)
+
+    # 5. Remove remaining HTML comments
+    html = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
+
+    return html
+
+
 def _extract_html_body(msg):
     """Extract body as HTML, preferring HTML part. Wraps plain text in basic HTML if needed."""
     html_part = msg.get_body(preferencelist=("html",))
@@ -189,6 +229,7 @@ def fetch_new_emails():
                         if keep_n:
                             html_body = _truncate_to_latest(html_body, keep_n)
                             log(f"ROR{keep_n}> mode: keeping latest {keep_n} message(s)")
+                        html_body = _clean_email_html(html_body)
                         mode_label = f"ROR{n_str}>"
                         body_contents.append((title, html_body))
                         log(f"{mode_label} detected, will convert body to PDF: {title}")

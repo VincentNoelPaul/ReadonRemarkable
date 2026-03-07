@@ -155,16 +155,38 @@ img {{ max-width: 100%; height: auto; }}
             os.remove(html_path)
 
 
+def _html_to_pdf_wkhtmltopdf(html_content, safe_title):
+    """Fallback: convert HTML to PDF using wkhtmltopdf."""
+    html_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
+            f.write(html_content.encode("utf-8"))
+            html_path = f.name
+        pdf_path = f"/tmp/{safe_title}.pdf"
+        subprocess.run(
+            ["wkhtmltopdf", "--encoding", "utf-8", html_path, pdf_path],
+            check=True, capture_output=True, timeout=120,
+        )
+        log(f"Generated PDF via wkhtmltopdf fallback: {safe_title}")
+        return pdf_path
+    except Exception as e:
+        log(f"wkhtmltopdf fallback also failed: {e}")
+        return None
+    finally:
+        if html_path and os.path.exists(html_path):
+            os.remove(html_path)
+
+
 def html_to_pdf(html_content, title):
-    """Convert an HTML string (email body) to a PDF using Playwright."""
+    """Convert an HTML string (email body) to a PDF.
+
+    Tries Playwright first, falls back to wkhtmltopdf.
+    """
+    safe_title = sanitize_filename(title)
+
     try:
         from playwright.sync_api import sync_playwright
-    except ImportError:
-        log("Playwright not installed, cannot convert HTML to PDF")
-        return None
 
-    safe_title = sanitize_filename(title)
-    try:
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
@@ -182,8 +204,9 @@ def html_to_pdf(html_content, title):
             log(f"Generated PDF from email body: {safe_title}")
             return pdf_path
     except Exception as e:
-        log(f"HTML-to-PDF generation failed: {e}")
-        return None
+        log(f"Playwright HTML-to-PDF failed ({e}), trying wkhtmltopdf fallback")
+
+    return _html_to_pdf_wkhtmltopdf(html_content, safe_title)
 
 
 def url_to_pdf(url):
